@@ -14,6 +14,14 @@ from django.db.models import Count
 User = get_user_model()
 PAGINATOR_PAGES_COUNT = 10
 
+def is_public(query_set):
+    return query_set.filter(is_published__exact=True, category__is_published__exact=True)
+
+def comment_calc(query_set):
+    return query_set.annotate(
+        comment_count=Count('comments')
+    )
+
 def get_paginator(request, query_set):
     paginator = Paginator(query_set, PAGINATOR_PAGES_COUNT)
     page_number = request.GET.get('page')
@@ -23,14 +31,9 @@ def date_filter(query_set):
     return query_set.filter(pub_date__lte=dati.now()).order_by('-pub_date')
 
 def index(request):
-    post_list = date_filter(Post.objects.select_related(
+    post_list = date_filter(comment_calc(is_public(Post.objects.select_related(
         'category', 'location', 'author'
-    )).filter(
-        is_published__exact=True,
-        category__is_published__exact=True
-    ).annotate(
-        comment_count=Count('comments')
-    )
+    ))))
     post_list_pag = get_paginator(request, post_list)
     context = {'page_obj': post_list_pag}
     return render(request, 'blog/index.html', context)
@@ -58,9 +61,7 @@ def category_posts(request, category_slug):
     category = get_object_or_404(Category, slug__exact=category_slug)
     if not category.is_published:
         raise Http404()
-    post_list = date_filter(category.post.all()).filter(
-        is_published__exact=True,
-    )
+    post_list = date_filter(comment_calc(is_public(category.post.all())))
     post_list_pag = get_paginator(request, post_list)
     context = {
         'page_obj': post_list_pag,
@@ -147,23 +148,11 @@ def profile(request, username):
         username=username,
     )
     if request.user != profile_user:
-        post_list = date_filter(profile_user.post.all(
-        ).filter(
-            is_published__exact=True,
-            category__is_published__exact=True
-        ).annotate(
-        comment_count=Count('comments')
-        ).order_by(
-            'title'
-        ))
+        post_list = date_filter(comment_calc(is_public(profile_user.post.all())).order_by('title'))
     else:
-        post_list = profile_user.post.all(
-
-        ).annotate(
-        comment_count=Count('comments')
-        ).order_by(
-            'title'
-        ).order_by('-pub_date')
+        post_list = comment_calc(
+            profile_user.post.all()
+        ).order_by('title').order_by('-pub_date')
     post_list_pag = get_paginator(request, post_list)
     context = {
         'profile': profile_user,
