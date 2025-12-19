@@ -148,11 +148,11 @@ def profile(request, username):
         username=username,
     )
     if request.user != profile_user:
-        post_list = date_filter(comment_calc(is_public(profile_user.post.all())).order_by('title'))
+        post_list = date_filter(comment_calc(is_public(profile_user.post.all())))
     else:
         post_list = comment_calc(
             profile_user.post.all()
-        ).order_by('title').order_by('-pub_date')
+        ).order_by('-pub_date')
     post_list_pag = get_paginator(request, post_list)
     context = {
         'profile': profile_user,
